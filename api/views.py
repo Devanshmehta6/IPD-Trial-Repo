@@ -3,14 +3,12 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 import requests,json
 from django.views.decorators.csrf import csrf_exempt
-from io import BytesIO
-import tokenize
 import ast
-import svgwrite
+
 
 @csrf_exempt
 def index(request):
-    return render(request,'index.html')
+    return HttpResponse("Hello Devansh")
 
 @csrf_exempt
 def format_code(request):
