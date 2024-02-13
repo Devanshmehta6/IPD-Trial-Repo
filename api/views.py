@@ -110,9 +110,10 @@ def extract_value(node):
     elif isinstance(node, ast.Expr):
         return extract_value(node.value)
     elif isinstance(node, ast.BinOp):
+        
         left = extract_value(node.left)
         right = extract_value(node.right)
-        return {"left": left, "right": right}
+        return {"l": left, "right": right, "op" : node.op}
     else:
         return str(node)
 
@@ -137,8 +138,22 @@ def extract_info(node):
             if isinstance(target, ast.Name):
                 info["variable"] = target.id
                 info["value"] = extract_value(node.value)
+                info["operator"] = extract_operator(node.value.op)
     return info
 
+def extract_operator(node):
+    if isinstance(node, ast.Add):
+        return "+"
+    elif isinstance(node, ast.Sub):
+        return "-"
+    elif isinstance(node,ast.Mult):
+        return "*"
+    elif isinstance(node,ast.Div):
+        return "/"
+    # Add more cases for other operators as needed
+    else:
+        return str(node)    
+    
 def process_ast(source_code):
     tree = ast.parse(source_code)
     return [extract_info(node) for node in ast.walk(tree) if isinstance(node, (ast.Assign, ast.FunctionDef, ast.For, ast.If))]
