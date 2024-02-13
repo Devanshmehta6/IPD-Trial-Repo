@@ -113,7 +113,7 @@ def extract_value(node):
         
         left = extract_value(node.left)
         right = extract_value(node.right)
-        return {"l": left, "right": right, "op" : node.op}
+        return {"left": left, "right": right, "op" : node.op}
     else:
         return str(node)
 
@@ -138,7 +138,8 @@ def extract_info(node):
             if isinstance(target, ast.Name):
                 info["variable"] = target.id
                 info["value"] = extract_value(node.value)
-                info["operator"] = extract_operator(node.value.op)
+                if hasattr(node.value, 'op'):
+                    info["value"]["op"] = extract_operator(node.value.op)
     return info
 
 def extract_operator(node):
