@@ -142,7 +142,21 @@ def extract_info(node, current_class=None):
         for stmt in node.body:
             class_member_info = extract_info(stmt, current_class=node.name)
             if class_member_info:  # Avoid adding empty dictionaries to "body"
-                info["class"]["body"].append(class_member_info)
+                if "variable" in class_member_info and "value" in class_member_info:
+                    # Check if the assignment involves creating an instance of the class
+                    if class_member_info["value"].get("func") == node.name:
+                        instance_info = {
+                            "instance_name": class_member_info["variable"],
+                            "class_name": node.name,
+                            "methods": []
+                        }
+                        # Extract methods called on the instance
+                        for method_call in class_member_info.get("value", {}).get("args", []):
+                            if isinstance(method_call, ast.Call):
+                                instance_info["methods"].append(method_call.func.id)
+                        info["class"]["instances"].append(instance_info)
+                else:
+                    info["class"]["body"].append(class_member_info)
 
     return info
 
