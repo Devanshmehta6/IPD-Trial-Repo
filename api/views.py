@@ -50,7 +50,7 @@ def createASTfromAPI(request):
 
     result = process_ast(code_to_parse)
     json_result = json.dumps(result)
-    print("Json ---------- ",json_result)
+    # print("Json ---------- ",json_result)
 
     return HttpResponse(json_result)
 
@@ -84,17 +84,6 @@ def traverse_dict(node, result_list, current_path=None):
 
     print('RESULT ----------- ',result_list)
 
-# @csrf_exempt
-# def extract_only_necessary_values(data, keys_to_extract, result_list, prev_key=None):
-#     if isinstance(data, dict):
-#         for key, value in data.items():
-#             if key in keys_to_extract and not isinstance(value, dict):
-#                 result_list.append({key: value})
-#                 prev_key = key
-#             extract_only_necessary_values(value, keys_to_extract, result_list, prev_key=key)
-#     elif isinstance(data, list):
-#         for item in data:
-#             extract_only_necessary_values(item, keys_to_extract, result_list, prev_key)
 
 @csrf_exempt
 # lower level things like bin operations, or simple code like variables
@@ -119,20 +108,24 @@ def extract_value(node):
 
 @csrf_exempt
 #higher level concepts like loops, functions, class
-def extract_info(node):
+def extract_info(node, current_class=None):
     info = {}
+
     if isinstance(node, ast.FunctionDef):
+        function_name = node.name    
         info["function"] = node.name
         info["args"] = [arg.arg for arg in node.args.args]
         info["body"] = [extract_info(stmt) for stmt in node.body]
+        print(info)
 
     elif isinstance(node, ast.For):
         info["for_loop"] = {
             "variable": node.target.id,
             "iterable": extract_value(node.iter),
-            "body": [extract_info(stmt) for stmt in node.body]
+            "body": [extract_info(stmt, current_class) for stmt in node.body]
         }
-    
+
+
     elif isinstance(node, ast.Assign):
         for target in node.targets:
             if isinstance(target, ast.Name):
@@ -140,6 +133,17 @@ def extract_info(node):
                 info["value"] = extract_value(node.value)
                 if hasattr(node.value, 'op'):
                     info["value"]["op"] = extract_operator(node.value.op)
+
+    elif isinstance(node, ast.ClassDef):
+        info["class"] = {
+            "name": node.name,
+            "body": []
+        }
+        for stmt in node.body:
+            class_member_info = extract_info(stmt, current_class=node.name)
+            if class_member_info:  # Avoid adding empty dictionaries to "body"
+                info["class"]["body"].append(class_member_info)
+
     return info
 
 def extract_operator(node):
@@ -157,6 +161,7 @@ def extract_operator(node):
     
 def process_ast(source_code):
     tree = ast.parse(source_code)
-    return [extract_info(node) for node in ast.walk(tree) if isinstance(node, (ast.Assign, ast.FunctionDef, ast.For, ast.If))]
+    res = [extract_info(node) for node in ast.walk(tree) if isinstance(node, (ast.Assign, ast.FunctionDef, ast.For, ast.If, ast.ClassDef))]
+    return res 
 
 
