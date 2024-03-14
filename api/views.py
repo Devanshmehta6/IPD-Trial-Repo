@@ -4,6 +4,8 @@ from django.shortcuts import redirect, render
 import requests,json
 from django.views.decorators.csrf import csrf_exempt
 import ast
+import astor
+
 
 
 @csrf_exempt
@@ -43,46 +45,16 @@ def createASTfromAPI(request):
     request.session['output'] = actual_output
 
     code_to_parse = request.session.get('code')
-    ast_tree = ast.parse(code_to_parse)
-    ast_dict = ast_to_dict(ast_tree)
+    # ast_tree = ast.parse(code_to_parse)
+    # ast_dict = ast_to_dict(ast_tree)
 
-    keys_to_extract = ['node_type','arg', 'name', 'id', 'value']
+    keys_to_extract = ['node_type','arg', 'name', 'id', 'value','args']
 
     result = process_ast(code_to_parse)
     json_result = json.dumps(result)
     # print("Json ---------- ",json_result)
 
     return HttpResponse(json_result)
-
-@csrf_exempt
-def ast_to_dict(node):
-    if isinstance(node, ast.AST):
-        return {
-            'node_type': type(node).__name__,
-            'fields': {field: ast_to_dict(value) for field, value in ast.iter_fields(node)}
-        }
-    elif isinstance(node, list):
-        return [ast_to_dict(item) for item in node]
-    else:
-        return node
-
-@csrf_exempt
-def traverse_dict(node, result_list, current_path=None):
-    if current_path is None:
-        current_path = []
-
-    if isinstance(node, dict):
-        for key, value in node.items():
-            new_path = current_path + [key]
-            traverse_dict(value, result_list, new_path)
-    elif isinstance(node, list):
-        for index, item in enumerate(node):
-            new_path = current_path + [index]
-            traverse_dict(item, result_list, new_path)
-    else:
-        result_list.append((current_path, node))
-
-    print('RESULT ----------- ',result_list)
 
 
 @csrf_exempt
@@ -98,33 +70,30 @@ def extract_value(node):
         return node.value
     elif isinstance(node, ast.Expr):
         return extract_value(node.value)
-    elif isinstance(node, ast.BinOp):
-        
+    elif isinstance(node, ast.BinOp):    
         left = extract_value(node.left)
         right = extract_value(node.right)
-        return {"left": left, "right": right, "op" : node.op}
+        return {"left": left, "right": right, "op": node.op}
     else:
         return str(node)
 
 @csrf_exempt
-#higher level concepts like loops, functions, class
-def extract_info(node, current_class=None):
+def extract_info(node):
+    
     info = {}
-
+    
     if isinstance(node, ast.FunctionDef):
         function_name = node.name    
         info["function"] = node.name
         info["args"] = [arg.arg for arg in node.args.args]
         info["body"] = [extract_info(stmt) for stmt in node.body]
-        print(info)
 
     elif isinstance(node, ast.For):
         info["for_loop"] = {
             "variable": node.target.id,
             "iterable": extract_value(node.iter),
-            "body": [extract_info(stmt, current_class) for stmt in node.body]
+            "body": [extract_info(stmt) for stmt in node.body]
         }
-
 
     elif isinstance(node, ast.Assign):
         for target in node.targets:
@@ -134,17 +103,44 @@ def extract_info(node, current_class=None):
                 if hasattr(node.value, 'op'):
                     info["value"]["op"] = extract_operator(node.value.op)
 
+
     elif isinstance(node, ast.ClassDef):
         info["class"] = {
             "name": node.name,
-            # "body": []
         }
-        # for stmt in node.body:
-        #     class_member_info = extract_info(stmt, current_class=node.name)
-        #     if class_member_info:  # Avoid adding empty dictionaries to "body"
-        #         info["class"]["body"].append(class_member_info)
+
+    elif isinstance(node, ast.If):
+        info["if_statement"] = {}
+    
+    # Extract condition from the if statement
+        if isinstance(node.test, ast.Compare):
+            comparators = [extract_value(comp) for comp in node.test.comparators]
+            ops = [extract_operator(op) for op in node.test.ops]
+            condition = {"left": extract_value(node.test.left), "comparators": comparators, "ops": ops}
+        else:
+            condition = extract_value(node.test)
+        
+        info["if_statement"]["condition"] = condition
+
+        # Extract statements inside the if block
+        if_statements = []
+        for stmt in node.body:
+            if_statements.append(astor.to_source(stmt).strip())
+        info["if_statement"]["if_statements"] = if_statements
+
+        # Extract statements inside the else block, if present
+        else_statements = []
+        if node.orelse:
+            for stmt in node.orelse:
+                else_statements.append(astor.to_source(stmt).strip())
+        info["if_statement"]["else_statements"] = else_statements
 
     return info
+
+def extract_condition(node):
+    if isinstance(node, ast.If):
+        condition_str = astor.to_source(node.test).strip()
+        return condition_str
 
 def extract_operator(node):
     if isinstance(node, ast.Add):
@@ -155,9 +151,31 @@ def extract_operator(node):
         return "*"
     elif isinstance(node,ast.Div):
         return "/"
+    elif isinstance(node, ast.Eq):
+        return "Equals"
+    elif isinstance(node, ast.NotEq):
+        return "NotEquals"
+    elif isinstance(node, ast.Lt):
+        return "LessThan"
+    elif isinstance(node, ast.LtE):
+        return "LessThanOrEquals"
+    elif isinstance(node, ast.Gt):
+        return "GreaterThan"
+    elif isinstance(node, ast.GtE):
+        return "GreaterThanOrEquals"
+    elif isinstance(node, ast.Is):
+        return "Is"
+    elif isinstance(node, ast.IsNot):
+        return "IsNot"
+    elif isinstance(node, ast.In):
+        return "In"
+    elif isinstance(node, ast.NotIn):
+        return "NotIn"
     # Add more cases for other operators as needed
     else:
-        return str(node)    
+        return str(node)
+
+
     
 def process_ast(source_code):
     tree = ast.parse(source_code)
