@@ -4,7 +4,7 @@ from django.shortcuts import redirect, render
 import requests,json
 from django.views.decorators.csrf import csrf_exempt
 import ast
-import astor
+# import astor
 
 
 
@@ -52,7 +52,7 @@ def createASTfromAPI(request):
 
     result = process_ast(code_to_parse)
     json_result = json.dumps(result)
-    # print("Json ---------- ",json_result)
+    print("Json ---------- ",json_result)
 
     return HttpResponse(json_result)
 
@@ -109,38 +109,38 @@ def extract_info(node):
             "name": node.name,
         }
 
-    elif isinstance(node, ast.If):
-        info["if_statement"] = {}
+    # elif isinstance(node, ast.If):
+    #     info["if_statement"] = {}
     
-    # Extract condition from the if statement
-        if isinstance(node.test, ast.Compare):
-            comparators = [extract_value(comp) for comp in node.test.comparators]
-            ops = [extract_operator(op) for op in node.test.ops]
-            condition = {"left": extract_value(node.test.left), "comparators": comparators, "ops": ops}
-        else:
-            condition = extract_value(node.test)
+    # # Extract condition from the if statement
+    #     if isinstance(node.test, ast.Compare):
+    #         comparators = [extract_value(comp) for comp in node.test.comparators]
+    #         ops = [extract_operator(op) for op in node.test.ops]
+    #         condition = {"left": extract_value(node.test.left), "comparators": comparators, "ops": ops}
+    #     else:
+    #         condition = extract_value(node.test)
         
-        info["if_statement"]["condition"] = condition
+    #     info["if_statement"]["condition"] = condition
 
-        # Extract statements inside the if block
-        if_statements = []
-        for stmt in node.body:
-            if_statements.append(astor.to_source(stmt).strip())
-        info["if_statement"]["if_statements"] = if_statements
+    #     # Extract statements inside the if block
+    #     if_statements = []
+    #     for stmt in node.body:
+    #         if_statements.append(astor.to_source(stmt).strip())
+    #     info["if_statement"]["if_statements"] = if_statements
 
-        # Extract statements inside the else block, if present
-        else_statements = []
-        if node.orelse:
-            for stmt in node.orelse:
-                else_statements.append(astor.to_source(stmt).strip())
-        info["if_statement"]["else_statements"] = else_statements
+    #     # Extract statements inside the else block, if present
+    #     else_statements = []
+    #     if node.orelse:
+    #         for stmt in node.orelse:
+    #             else_statements.append(astor.to_source(stmt).strip())
+    #     info["if_statement"]["else_statements"] = else_statements
 
     return info
 
-def extract_condition(node):
-    if isinstance(node, ast.If):
-        condition_str = astor.to_source(node.test).strip()
-        return condition_str
+# def extract_condition(node):
+#     if isinstance(node, ast.If):
+#         condition_str = astor.to_source(node.test).strip()
+#         return condition_str
 
 def extract_operator(node):
     if isinstance(node, ast.Add):
